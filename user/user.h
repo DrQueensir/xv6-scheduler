@@ -2,6 +2,10 @@
 
 struct stat;
 
+//our modifications start
+struct schedstat;
+//our modifications end
+
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
@@ -25,6 +29,9 @@ char *sys_sbrk(int, int);
 int pause(int);
 int uptime(void);
 int sync(void);
+//our modifications start
+int waitstat(int *, struct schedstat *);
+//our modifications end
 
 // ulib.c
 int stat(const char *, struct stat *);

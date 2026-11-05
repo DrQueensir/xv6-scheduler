@@ -35,7 +35,21 @@ sys_wait(void)
   argaddr(0, &p);
   return kwait(p);
 }
+//our modifications start
 
+uint64
+sys_waitstat(void)
+{
+  uint64 status_addr;
+  uint64 stats_addr;
+
+  argaddr(0, &status_addr);
+  argaddr(1, &stats_addr);
+
+  return kwaitstat(status_addr, stats_addr);
+}
+
+//our modifications end
 uint64
 sys_sbrk(void)
 {

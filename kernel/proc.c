@@ -5,6 +5,9 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+//our modifications start
+#include "schedstat.h"
+//our modifications end
 
 struct cpu cpus[NCPU];
 
@@ -124,6 +127,23 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  //our modifications start
+
+  // Initialize process scheduling statistics
+  p->arrival_tick = 0;
+  p->first_run_tick = 0;
+  p->completion_tick = 0;
+
+  p->total_wait_ticks = 0;
+  p->total_run_ticks = 0;
+  p->context_switches = 0;
+  p->max_wait_ticks = 0;
+
+  p->runnable_since = 0;
+  p->running_since = 0;
+  p->has_run = 0;
+
+  //our modifications end
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -225,6 +245,10 @@ userinit(void)
 
   p->cwd = namei("/");
 
+  //our modifications start
+  p->arrival_tick = ticks;
+  p->runnable_since = ticks;
+  //our modifications end
   p->state = RUNNABLE;
 
   release(&p->lock);
@@ -298,6 +322,10 @@ kfork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
+  //our modifications start
+  np->arrival_tick = ticks;
+  np->runnable_since = ticks;
+  //our modiciations end
   np->state = RUNNABLE;
   release(&np->lock);
 
@@ -355,6 +383,9 @@ kexit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
+  //our modifications start
+  p->completion_tick = ticks;
+  //our modifications end
   p->state = ZOMBIE;
 
   release(&wait_lock);
@@ -366,8 +397,9 @@ kexit(int status)
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
+// our modifications start
 int
-kwait(uint64 addr)
+kwaitstat(uint64 addr,uint64 stataddr)
 {
   struct proc *pp;
   int havekids, pid;
@@ -394,6 +426,24 @@ kwait(uint64 addr)
             release(&wait_lock);
             return -1;
           }
+	  if (stataddr != 0) {
+             struct schedstat st;
+
+             st.arrival_tick = pp->arrival_tick;
+             st.first_run_tick = pp->first_run_tick;
+             st.completion_tick = pp->completion_tick;
+             st.total_wait_ticks = pp->total_wait_ticks;
+             st.total_run_ticks = pp->total_run_ticks;
+             st.context_switches = pp->context_switches;
+             st.max_wait_ticks = pp->max_wait_ticks;
+
+             if (copyout(p->pagetable, p->sz, stataddr,
+                         (char *)&st, sizeof(st)) < 0) {
+                release(&pp->lock);
+                release(&wait_lock);
+                return -1;
+             }
+          }
           pp->parent = 0;
           freeproc(pp);
           release(&pp->lock);
@@ -417,6 +467,13 @@ kwait(uint64 addr)
     acquire(&wait_lock);
   }
 }
+
+int
+kwait(uint64 addr)
+{
+  return kwaitstat(addr, 0);
+}
+//our modifications end
 
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -448,6 +505,27 @@ scheduler(void)
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
+
+	// our modifications start
+
+	uint now = ticks;
+	uint waited = now - p->runnable_since;
+        p->total_wait_ticks += waited;
+
+	if (waited > p->max_wait_ticks) {
+          p->max_wait_ticks = waited;
+	}
+
+	if (!p->has_run) {
+          p->first_run_tick = now;
+          p->has_run = 1;
+        }
+
+	p->running_since = now;
+	p->context_switches++;
+
+        // our modifications end
+
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -490,6 +568,9 @@ sched(void)
     panic("sched RUNNING");
   if (intr_get())
     panic("sched interruptible");
+  // our modifications start
+  p->total_run_ticks += ticks - p->running_since;
+  // our modifications end
 
   intena = mycpu()->intena;
   swtch(&p->context, &mycpu()->context);
@@ -502,6 +583,9 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
+  //our modifications start
+  p->runnable_since = ticks;
+  // our modifications end
   p->state = RUNNABLE;
   sched();
   release(&p->lock);
@@ -587,6 +671,9 @@ wakeup(void *chan)
       // If this waiting process has gotten so far as to actually
       // go to sleep, also set it back to RUNNING.
       if (p->state == SLEEPING) {
+	//our modifications start
+	p->runnable_since = ticks;
+	//our modifications end
         p->state = RUNNABLE;
       }
     }
@@ -611,6 +698,9 @@ kkill(int pid)
       p->killed = 1;
       if (p->state == SLEEPING) {
         // Wake process from sleep().
+	// our modifications start
+	p->runnable_since = ticks;
+        //our modifications end
         p->state = RUNNABLE;
       }
       release(&p->lock);

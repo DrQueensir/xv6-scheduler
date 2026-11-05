@@ -21,3 +21,7 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_sync   22
+
+//our modifications start
+#define SYS_waitstat 23
+//our modifications end

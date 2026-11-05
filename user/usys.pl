@@ -43,3 +43,6 @@ entry("sbrk");
 entry("pause");
 entry("uptime");
 entry("sync");
+#our modifications start
+entry("waitstat");
+#our modifications end
