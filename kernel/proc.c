@@ -399,7 +399,7 @@ kexit(int status)
 // Return -1 if this process has no children.
 // our modifications start
 int
-kwaitstat(uint64 addr,uint64 stataddr)
+kwaitstat(uint64 addr, uint64 stataddr)
 {
   struct proc *pp;
   int havekids, pid;
@@ -426,23 +426,23 @@ kwaitstat(uint64 addr,uint64 stataddr)
             release(&wait_lock);
             return -1;
           }
-	  if (stataddr != 0) {
-             struct schedstat st;
+          if (stataddr != 0) {
+            struct schedstat st;
 
-             st.arrival_tick = pp->arrival_tick;
-             st.first_run_tick = pp->first_run_tick;
-             st.completion_tick = pp->completion_tick;
-             st.total_wait_ticks = pp->total_wait_ticks;
-             st.total_run_ticks = pp->total_run_ticks;
-             st.context_switches = pp->context_switches;
-             st.max_wait_ticks = pp->max_wait_ticks;
+            st.arrival_tick = pp->arrival_tick;
+            st.first_run_tick = pp->first_run_tick;
+            st.completion_tick = pp->completion_tick;
+            st.total_wait_ticks = pp->total_wait_ticks;
+            st.total_run_ticks = pp->total_run_ticks;
+            st.context_switches = pp->context_switches;
+            st.max_wait_ticks = pp->max_wait_ticks;
 
-             if (copyout(p->pagetable, p->sz, stataddr,
-                         (char *)&st, sizeof(st)) < 0) {
-                release(&pp->lock);
-                release(&wait_lock);
-                return -1;
-             }
+            if (copyout(p->pagetable, p->sz, stataddr, (char *)&st,
+                        sizeof(st)) < 0) {
+              release(&pp->lock);
+              release(&wait_lock);
+              return -1;
+            }
           }
           pp->parent = 0;
           freeproc(pp);
@@ -506,23 +506,23 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
 
-	// our modifications start
+        // our modifications start
 
-	uint now = ticks;
-	uint waited = now - p->runnable_since;
+        uint now = ticks;
+        uint waited = now - p->runnable_since;
         p->total_wait_ticks += waited;
 
-	if (waited > p->max_wait_ticks) {
+        if (waited > p->max_wait_ticks) {
           p->max_wait_ticks = waited;
-	}
+        }
 
-	if (!p->has_run) {
+        if (!p->has_run) {
           p->first_run_tick = now;
           p->has_run = 1;
         }
 
-	p->running_since = now;
-	p->context_switches++;
+        p->running_since = now;
+        p->context_switches++;
 
         // our modifications end
 
@@ -671,9 +671,9 @@ wakeup(void *chan)
       // If this waiting process has gotten so far as to actually
       // go to sleep, also set it back to RUNNING.
       if (p->state == SLEEPING) {
-	//our modifications start
-	p->runnable_since = ticks;
-	//our modifications end
+        //our modifications start
+        p->runnable_since = ticks;
+        //our modifications end
         p->state = RUNNABLE;
       }
     }
@@ -698,8 +698,8 @@ kkill(int pid)
       p->killed = 1;
       if (p->state == SLEEPING) {
         // Wake process from sleep().
-	// our modifications start
-	p->runnable_since = ticks;
+        // our modifications start
+        p->runnable_since = ticks;
         //our modifications end
         p->state = RUNNABLE;
       }
